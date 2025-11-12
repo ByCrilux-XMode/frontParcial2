@@ -1,7 +1,7 @@
 #nextjs docker
 #build
 #04/11/2025 sprint 3
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -10,8 +10,9 @@ RUN npm install
 COPY . .
 
 RUN npm run build
+
 #build final
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 COPY --from=builder /app ./

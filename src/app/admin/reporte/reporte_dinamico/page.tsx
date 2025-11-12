@@ -79,7 +79,7 @@ async function downloadReporte(prompt: string) {
 }
 
 // ------------------------------------------------------------------
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPALssssssssssssssssss
 // ------------------------------------------------------------------
 
 export default function ReporteDinamicoPage() {

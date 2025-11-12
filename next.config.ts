@@ -10,7 +10,13 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'res.cloudinary.com',
         port: '',
-        pathname: '/**', // Permite cualquier ruta dentro de ese hostname
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ejemplo.com',
+        port: '',
+        pathname: '/**',
       },
     ],
   },

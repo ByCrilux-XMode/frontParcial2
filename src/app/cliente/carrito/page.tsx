@@ -1,10 +1,9 @@
 "use client";
-
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { useCart } from "@/context/CartContext";
 import { apiFetcher } from "@/lib/apiFetcher";
 import { ItemCarritoGet } from "@/types/venta/itemCarrito";
-import { Loader2, Trash2, Plus, Minus } from "lucide-react"; // <-- Importar Plus/Minus
+import { Loader2, Trash2, Plus, Minus,CreditCard, QrCode } from "lucide-react"; // <-- Importar Plus/Minus
 import Image from "next/image";
 import { useState } from "react"; // <-- Importar useState
 
@@ -114,7 +113,59 @@ export default function CarritoPage() {
   
   // 5. Obtenemos 'items' del contexto
   // Ya no usamos SWR aquí, useCart() nos da los items actualizados
-  const { items, isLoading, error } = useCart();
+  const { items, isLoading, error, cartId } = useCart();
+  const { mutate } = useSWRConfig();
+  const [paymentMethod, setPaymentMethod] = useState("QR");
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const handleCheckout = async () => {
+    if (items.length === 0) return;
+
+    setIsCheckingOut(true);
+    setCheckoutError(null);
+
+    try {
+      // 1. Construir el DTO (CheckoutRequestDTO)
+      const itemsPayload = items.map((item) => ({
+        prodVarianteId: item.prodVariante.id,
+        cantidad: item.cantidad,
+      }));
+
+      const checkoutRequest = {
+        metodoPago: paymentMethod,
+        items: itemsPayload,
+      };
+
+      // 2. Llamar a nuestra NUEVA API route
+      // (Esta ruta llama a /venta/venta/generar-pago en el backend)
+      const response = await apiFetcher<{ urlPasarelaPagos: string }>(
+        "/api/venta/venta/generar-pago",
+        {
+          method: "POST",
+          body: JSON.stringify(checkoutRequest),
+        }
+      );
+
+      // 3. Manejar la respuesta
+      const urlPasarela = response.urlPasarelaPagos;
+      if (urlPasarela) {
+        // 4. Refrescar el SWR del carrito (el backend ya lo vació)
+        mutate(`/api/venta/itemcarrito/porcarrito/${cartId}`);
+
+        // 5. Redirigir a Libélula (equivalente a launchUrl)
+        window.location.href = urlPasarela;
+      } else {
+        throw new Error("No se recibió la URL de pago desde el servidor.");
+      }
+    } catch (err: any) {
+      setCheckoutError(
+        err.message || "Ocurrió un error al procesar el pago."
+      );
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -124,6 +175,8 @@ export default function CarritoPage() {
       </div>
     );
   }
+
+  
 
   if (error) {
     return (
@@ -174,21 +227,86 @@ export default function CarritoPage() {
           </tbody>
         </table>
       </div>
-      
-      {/* 7. Sección de Total y Checkout */}
-      <div className="mt-6 flex flex-col items-end">
-        <div className="text-right">
-          <p className="text-lg text-gray-600">
-            Total:{" "}
-            <span className="text-2xl font-bold text-gray-900">
-              {formatPrice(totalGeneral)}
-            </span>
-          </p>
+
+      {/* --- INICIO SECCIÓN DE CHECKOUT MODIFICADA --- */}
+      <div className="mt-6 flex flex-col items-end gap-4">
+        {/* Selección de Método de Pago */}
+        <div className="w-full max-w-sm space-y-3">
+          <h3 className="text-lg font-semibold">Método de Pago</h3>
+          <div className="flex gap-4">
+            {/* Opción QR */}
+            <label
+              className={`flex flex-1 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                paymentMethod === "QR"
+                  ? "border-blue-600 bg-blue-50 ring-2 ring-blue-500"
+                  : "border-gray-300 bg-white hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="QR"
+                checked={paymentMethod === "QR"}
+                onChange={() => setPaymentMethod("QR")}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              <QrCode className="h-5 w-5 text-gray-700" />
+              <span className="font-medium">Pago con QR</span>
+            </label>
+            {/* Opción Tarjeta */}
+            <label
+              className={`flex flex-1 cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                paymentMethod === "Tarjeta"
+                  ? "border-blue-600 bg-blue-50 ring-2 ring-blue-500"
+                  : "border-gray-300 bg-white hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="Tarjeta"
+                checked={paymentMethod === "Tarjeta"}
+                onChange={() => setPaymentMethod("Tarjeta")}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+              />
+              <CreditCard className="h-5 w-5 text-gray-700" />
+              <span className="font-medium">Tarjeta</span>
+            </label>
+          </div>
         </div>
-        <button className="mt-4 w-full rounded-md bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700 sm:w-auto">
-          Proceder al Pago
-        </button>
+
+        {/* Total y Botón de Pago */}
+        <div className="w-full max-w-sm border-t pt-4">
+          <div className="text-right">
+            <p className="text-lg text-gray-600">
+              Total:{" "}
+              <span className="text-2xl font-bold text-gray-900">
+                {formatPrice(totalGeneral)}
+              </span>
+            </p>
+          </div>
+
+          {/* Mostrar Error de Checkout */}
+          {checkoutError && (
+            <div className="mt-2 rounded-md bg-red-50 p-3 text-center text-sm font-medium text-red-700">
+              {checkoutError}
+            </div>
+          )}
+
+          <button
+            onClick={handleCheckout}
+            disabled={isCheckingOut}
+            className="mt-4 w-full rounded-md bg-green-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {isCheckingOut ? (
+              <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+            ) : (
+              "Proceder al Pago"
+            )}
+          </button>
+        </div>
       </div>
+      {/* --- FIN SECCIÓN DE CHECKOUT MODIFICADA --- */}
     </div>
   );
 }

@@ -143,6 +143,46 @@ export default function Sidebar() {
     },
   ];
 
+  const rol = user?.rolNombre;
+  let filteredMenuItems = [...menuItems];
+
+  if (rol === "ROLE_VENDEDOR") {
+    filteredMenuItems = menuItems
+      .filter(
+        (item) =>
+          item.name === "Panel Principal" ||
+          item.name === "Ventas & Caja" ||
+          item.name === "Inventario" || // <-- Añadido
+          item.name === "Usuarios"
+      )
+      .map((item) => {
+        if (item.name === "Usuarios") {
+          return {
+            ...item,
+            children: item.children?.filter(
+              (child) => child.name === "Clientes"
+            ),
+          };
+        }
+        if (item.name === "Inventario") {
+          // Para Vendedor, solo mostrar "Control de Stock"
+          return {
+            ...item,
+            children: item.children?.filter(
+              (child) => child.name === "Control de Stock"
+            ),
+          };
+        }
+        return item;
+      });
+  } else if (rol !== "ROLE_ADMIN") {
+    // Si no es vendedor ni admin, solo ve el panel principal
+    filteredMenuItems = menuItems.filter(
+      (item) => item.name === "Panel Principal"
+    );
+    console.log(rol);
+  }
+
   return (
     <>
       {/* Botón hamburguesa y overlay para móvil */}
@@ -185,7 +225,7 @@ export default function Sidebar() {
 
         {/* Navegación Principal */}
         <nav className="flex-1 p-3 space-y-2 font-medium">
-          {menuItems.map((item, i) => {
+          {filteredMenuItems.map((item, i) => {
             const hasChildren = !!item.children;
             const itemIsActive = item.href && isActive(item.href);
 

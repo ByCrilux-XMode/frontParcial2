@@ -20,6 +20,7 @@ export async function POST(request: Request) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ query: userQuery }), // Reenviamos la query
+            cache: 'no-store'
         });
 
         if (!n8nResponse.ok) {
